@@ -330,7 +330,6 @@ include $(srctree)/scripts/Kbuild.include
 
 AS		= $(CROSS_COMPILE)as
 LD		= $(CROSS_COMPILE)ld
-CC		= $(CROSS_COMPILE)gcc
 CPP		= $(CC) -E
 AR		= $(CROSS_COMPILE)ar
 NM		= $(CROSS_COMPILE)nm
@@ -375,6 +374,12 @@ CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
 # Highest level of basic gcc optimizations if enabled
 # This reads a imported string from the sabermod modified android build system
+ifdef SM_KERNEL_NAME
+  USE_GCC	= $(TARGET_KERNEL_TOOLS_PREFIX)gcc-$(SM_KERNEL_NAME)
+  CC	= $(USE_GCC)
+else
+  CC	= $(CROSS_COMPILE)gcc
+endif
 ifeq ($(strip $(O3_OPTIMIZATIONS)),true)
 SABERMOD_KERNEL_CFLAGS	:= -O3
 endif
