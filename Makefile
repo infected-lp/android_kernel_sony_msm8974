@@ -423,11 +423,13 @@ ifdef CONFIG_MACH_MSM8974_HAMMERHEAD_STRICT_ALIASING
     endif
 endif
 
-# Memory leak detector sanitizer
-ifdef SABERMOD_KERNEL_CFLAGS
-  SABERMOD_KERNEL_CFLAGS += -fsanitize=leak
-else
-  SABERMOD_KERNEL_CFLAGS := -fsanitize=leak
+ifneq (1,$(words $(DISABLE_SANITIZE_LEAK)))
+  # Memory leak detector sanitizer
+  ifdef SABERMOD_KERNEL_CFLAGS
+    SABERMOD_KERNEL_CFLAGS += -fsanitize=leak
+  else
+    SABERMOD_KERNEL_CFLAGS := -fsanitize=leak
+  endif
 endif
 
 ifeq ($(strip $(O3_OPTIMIZATIONS)),true)
