@@ -330,7 +330,6 @@ include $(srctree)/scripts/Kbuild.include
 
 AS		= $(CROSS_COMPILE)as
 LD		= $(CROSS_COMPILE)ld
-CPP		= $(CC) -E
 AR		= $(CROSS_COMPILE)ar
 NM		= $(CROSS_COMPILE)nm
 STRIP		= $(CROSS_COMPILE)strip
@@ -372,11 +371,13 @@ CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
 # Handle kernel CC flags by importing vendor/sm strings
 ifdef SM_KERNEL_NAME
-  USE_GCC = $(TARGET_KERNEL_TOOLS_PREFIX)gcc-$(SM_KERNEL_NAME)
+  USE_GCC = $(CROSS_COMPILE)gcc-$(SM_KERNEL_NAME)
   CC = $(USE_GCC)
 else
   CC = $(CROSS_COMPILE)gcc
 endif
+
+CPP = $(CC) -E
 
 # Highest level of basic gcc optimizations if enabled
 ifeq ($(strip $(LOCAL_O3)),true)
