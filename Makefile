@@ -377,8 +377,6 @@ else
   CC = $(CROSS_COMPILE)gcc
 endif
 
-CPP = $(CC) -E
-
 # Highest level of basic gcc optimizations if enabled
 ifeq ($(strip $(LOCAL_O3)),true)
   SABERMOD_KERNEL_FLAGS	:= -O3
@@ -447,6 +445,8 @@ ifdef SABERMOD_KERNEL_FLAGS
   CC += $(SABERMOD_KERNEL_FLAGS)
 endif
 # end The SaberMod Project additions
+
+CPP = $(CC) -E
 
 # Use LINUXINCLUDE when you must reference the include/ directory.
 # Needed to be compatible with the O= option

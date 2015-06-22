@@ -113,7 +113,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include <ctype.h>
-#include <arpa/inet.h>
+#include <stdint.h>
 
 #define INT_CONF ntohl(0x434f4e46)
 #define INT_ONFI ntohl(0x4f4e4649)
