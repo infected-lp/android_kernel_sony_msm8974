@@ -282,7 +282,6 @@ struct qpnp_chg_irq {
 	int		irq;
 	unsigned long		disabled;
 	unsigned long		wake_enable;
-	bool			is_wake;
 };
 
 struct qpnp_chg_regulator {
@@ -341,13 +340,11 @@ enum {
 
 #define VOLTAGE_MIN_QC_THRESHOLD 5000000
 
-#define CHG_LLK_CHECK_PERIOD_MS 1000
+/* battery capacity threshold of LLK */
+#define CHG_LLK_STOP_CAPACITY	35
+#define CHG_LLK_START_CAPACITY	30
 
-struct somc_limit_charge {
-	int		enable_llk;
-	int		llk_socmax;
-	int		llk_socmin;
-};
+#define CHG_LLK_CHECK_PERIOD_MS 1000
 
 struct qpnp_somc_params {
 	unsigned int		decirevision;
@@ -402,7 +399,7 @@ struct qpnp_somc_params {
 	unsigned int		stepchg_ibatmax_ma_under_step;
 	struct delayed_work	stepchg_work;
 	bool			stepchg_mode;
-	struct somc_limit_charge	limit_charge;
+	bool			enable_llk;
 	int			discharging_for_llk;
 	int			batt_id;
 	int			high_volt_chg_wait_cnt;
@@ -803,10 +800,6 @@ qpnp_chg_enable_irq(struct qpnp_chg_irq *irq)
 		pr_debug("number = %d\n", irq->irq);
 		enable_irq(irq->irq);
 	}
-	if ((irq->is_wake) && (!__test_and_set_bit(0, &irq->wake_enable))) {
-		pr_debug("enable wake, number = %d\n", irq->irq);
-		enable_irq_wake(irq->irq);
-	}
 }
 
 static void
@@ -815,10 +808,6 @@ qpnp_chg_disable_irq(struct qpnp_chg_irq *irq)
 	if (!__test_and_set_bit(0, &irq->disabled)) {
 		pr_debug("number = %d\n", irq->irq);
 		disable_irq_nosync(irq->irq);
-	}
-	if ((irq->is_wake) && (__test_and_clear_bit(0, &irq->wake_enable))) {
-		pr_debug("disable wake, number = %d\n", irq->irq);
-		disable_irq_wake(irq->irq);
 	}
 }
 
@@ -829,7 +818,6 @@ qpnp_chg_irq_wake_enable(struct qpnp_chg_irq *irq)
 		pr_debug("number = %d\n", irq->irq);
 		enable_irq_wake(irq->irq);
 	}
-	irq->is_wake = true;
 }
 
 static void
@@ -839,7 +827,6 @@ qpnp_chg_irq_wake_disable(struct qpnp_chg_irq *irq)
 		pr_debug("number = %d\n", irq->irq);
 		disable_irq_wake(irq->irq);
 	}
-	irq->is_wake = false;
 }
 
 #define USB_OTG_EN_BIT	BIT(0)
@@ -2279,8 +2266,6 @@ qpnp_batt_property_is_writeable(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_ENABLE_SHUTDOWN_AT_LOW_BATTERY:
 	case POWER_SUPPLY_PROP_BATT_AGING:
 	case POWER_SUPPLY_PROP_ENABLE_LLK:
-	case POWER_SUPPLY_PROP_LLK_SOCMAX:
-	case POWER_SUPPLY_PROP_LLK_SOCMIN:
 	case POWER_SUPPLY_PROP_BATT_ID:
 		return 1;
 	default:
@@ -2411,8 +2396,6 @@ static enum power_supply_property msm_batt_power_props[] = {
 	POWER_SUPPLY_PROP_ENABLE_SHUTDOWN_AT_LOW_BATTERY,
 	POWER_SUPPLY_PROP_BATT_AGING,
 	POWER_SUPPLY_PROP_ENABLE_LLK,
-	POWER_SUPPLY_PROP_LLK_SOCMAX,
-	POWER_SUPPLY_PROP_LLK_SOCMIN,
 	POWER_SUPPLY_PROP_BATT_ID,
 };
 
@@ -3008,13 +2991,7 @@ qpnp_batt_power_get_property(struct power_supply *psy,
 		val->intval = chip->somc_params.batt_aging;
 		break;
 	case POWER_SUPPLY_PROP_ENABLE_LLK:
-		val->intval = chip->somc_params.limit_charge.enable_llk;
-		break;
-	case POWER_SUPPLY_PROP_LLK_SOCMAX:
-		val->intval = chip->somc_params.limit_charge.llk_socmax;
-		break;
-	case POWER_SUPPLY_PROP_LLK_SOCMIN:
-		val->intval = chip->somc_params.limit_charge.llk_socmin;
+		val->intval = chip->somc_params.enable_llk;
 		break;
 	case POWER_SUPPLY_PROP_BATT_ID:
 		val->intval = chip->somc_params.batt_id;
@@ -4453,20 +4430,12 @@ qpnp_llk_check(struct qpnp_chg_chip *chip)
 		POWER_SUPPLY_PROP_CAPACITY, &ret);
 	soc = ret.intval;
 
-	pr_debug("LLK-FLG=%d MAX=%d MIN=%d\n",
-		chip->somc_params.limit_charge.enable_llk,
-		chip->somc_params.limit_charge.llk_socmax,
-		chip->somc_params.limit_charge.llk_socmin);
-
-	if (soc >= chip->somc_params.limit_charge.llk_socmax)
+	if (soc >= CHG_LLK_STOP_CAPACITY)
 		chip->somc_params.discharging_for_llk = true;
-	else if (soc <= chip->somc_params.limit_charge.llk_socmin)
+	else if (soc <= CHG_LLK_START_CAPACITY)
 		chip->somc_params.discharging_for_llk = false;
 
 llk_check_exit:
-	if (wa_llk == chip->somc_params.discharging_for_llk)
-		goto llk_pass_exit;
-
 	if (chip->somc_params.discharging_for_llk)
 		qpnp_chg_charge_en(chip, 0);
 	else
@@ -4479,7 +4448,6 @@ llk_check_exit:
 		power_supply_changed(&chip->batt_psy);
 	}
 
-llk_pass_exit:
 	pr_debug("soc=%d dischg_llk=%d dischg=%d\n",
 		soc, chip->somc_params.discharging_for_llk,
 		chip->charging_disabled);
@@ -4560,7 +4528,7 @@ health_check_work_exit:
 	pr_debug("target=%d vbat=%d wa_rb=%d\n",
 		target_mv, vbat_mv, chip->somc_params.workaround_prevent_rb);
 
-	if (chip->somc_params.limit_charge.enable_llk)
+	if (chip->somc_params.enable_llk)
 		qpnp_llk_check(chip);
 
 	return;
@@ -4804,15 +4772,14 @@ qpnp_chg_regulator_boost_enable(struct regulator_dev *rdev)
 			pr_err("failed to write SEC_ACCESS rc=%d\n", rc);
 			return rc;
 		}
-		if (chip->type != SMBBP) {
-			rc = qpnp_chg_masked_write(chip,
-				chip->usb_chgpth_base + COMP_OVR1,
-				0xFF,
-				0x2F, 1);
-			if (rc) {
-				pr_err("failed to write COMP_OVR1 rc=%d\n", rc);
-				return rc;
-			}
+
+		rc = qpnp_chg_masked_write(chip,
+			chip->usb_chgpth_base + COMP_OVR1,
+			0xFF,
+			0x2F, 1);
+		if (rc) {
+			pr_err("failed to write COMP_OVR1 rc=%d\n", rc);
+			return rc;
 		}
 	}
 
@@ -4897,16 +4864,16 @@ qpnp_chg_regulator_boost_disable(struct regulator_dev *rdev)
 			pr_err("failed to write SEC_ACCESS rc=%d\n", rc);
 			return rc;
 		}
-		if (chip->type != SMBBP) {
-			rc = qpnp_chg_masked_write(chip,
-				chip->usb_chgpth_base + COMP_OVR1,
-				0xFF,
-				0x00, 1);
-			if (rc) {
-				pr_err("failed to write COMP_OVR1 rc=%d\n", rc);
-				return rc;
-			}
+
+		rc = qpnp_chg_masked_write(chip,
+			chip->usb_chgpth_base + COMP_OVR1,
+			0xFF,
+			0x00, 1);
+		if (rc) {
+			pr_err("failed to write COMP_OVR1 rc=%d\n", rc);
+			return rc;
 		}
+
 		usleep(1000);
 
 		qpnp_chg_usb_suspend_enable(chip, 0);
@@ -5769,13 +5736,7 @@ qpnp_batt_power_set_property(struct power_supply *psy,
 		}
 		break;
 	case POWER_SUPPLY_PROP_ENABLE_LLK:
-		chip->somc_params.limit_charge.enable_llk = (int)val->intval;
-		break;
-	case POWER_SUPPLY_PROP_LLK_SOCMAX:
-		chip->somc_params.limit_charge.llk_socmax = (int)val->intval;
-		break;
-	case POWER_SUPPLY_PROP_LLK_SOCMIN:
-		chip->somc_params.limit_charge.llk_socmin = (int)val->intval;
+		chip->somc_params.enable_llk = !!val->intval;
 		break;
 	case POWER_SUPPLY_PROP_BATT_ID:
 		chip->somc_params.batt_id = val->intval;
@@ -5933,10 +5894,10 @@ qpnp_chg_request_irqs(struct qpnp_chg_chip *chip)
 
 			qpnp_chg_irq_wake_enable(&chip->chg_trklchg);
 			qpnp_chg_irq_wake_enable(&chip->chg_failed);
-			qpnp_chg_irq_wake_enable(&chip->chg_vbatdet_lo);
 			qpnp_chg_disable_irq(&chip->chg_vbatdet_lo);
-			break;
+			qpnp_chg_irq_wake_enable(&chip->chg_vbatdet_lo);
 
+			break;
 		case SMBB_BAT_IF_SUBTYPE:
 		case SMBBP_BAT_IF_SUBTYPE:
 		case SMBCL_BAT_IF_SUBTYPE:

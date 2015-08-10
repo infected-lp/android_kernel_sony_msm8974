@@ -156,10 +156,6 @@
 		compatible = "nxp,tfa98xx-codec";
 	};
 
-	qcom,wdt@f9017000 {
-		qcom,bark-time = <12000>;
-	};
-
 	qcom,msm-thermal {
 		qcom,core-control-mask = <0x6>;
 		qcom,freq-mitigation-value = <422400>;
@@ -779,7 +775,7 @@
 };
 
 &mdss_fb0 {
-	linux,contiguous-region = <&fb_mem>;
+	qcom,memory-reservation-size = <0x1000000>; /* size 16MB */
 };
 
 &pm8941_vadc {
@@ -807,14 +803,6 @@
 		/delete-property/ smd3;
 		/delete-property/ smd5;
 		/delete-property/ smd6;
-	};
-
-	memory {
-		fb_mem: fb_region@0 {
-			linux,contiguous-region;
-			reg = <0 0x1000000>;
-			label = "fb_mem";
-		};
 	};
 };
 

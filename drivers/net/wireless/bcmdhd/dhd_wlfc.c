@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_wlfc.c 548462 2015-04-13 09:02:48Z $
+ * $Id: dhd_wlfc.c 487288 2014-06-25 10:40:29Z $
  *
  */
 
@@ -168,7 +168,7 @@ exit:
 	hang-er: noun, a contrivance on which things are hung, as a hook.
 */
 static void*
-_dhd_wlfc_hanger_create(dhd_pub_t *dhd, int max_items)
+_dhd_wlfc_hanger_create(osl_t *osh, int max_items)
 {
 	int i;
 	wlfc_hanger_t* hanger;
@@ -176,10 +176,9 @@ _dhd_wlfc_hanger_create(dhd_pub_t *dhd, int max_items)
 	/* allow only up to a specific size for now */
 	ASSERT(max_items == WLFC_HANGER_MAXITEMS);
 
-	if ((hanger = (wlfc_hanger_t*)DHD_OS_PREALLOC(dhd, DHD_PREALLOC_DHD_WLFC_HANGER,
-		WLFC_HANGER_SIZE(max_items))) == NULL) {
+	if ((hanger = (wlfc_hanger_t*)MALLOC(osh, WLFC_HANGER_SIZE(max_items))) == NULL)
 		return NULL;
-	}
+
 	memset(hanger, 0, WLFC_HANGER_SIZE(max_items));
 	hanger->max_items = max_items;
 
@@ -190,12 +189,12 @@ _dhd_wlfc_hanger_create(dhd_pub_t *dhd, int max_items)
 }
 
 static int
-_dhd_wlfc_hanger_delete(dhd_pub_t *dhd, void* hanger)
+_dhd_wlfc_hanger_delete(osl_t *osh, void* hanger)
 {
 	wlfc_hanger_t* h = (wlfc_hanger_t*)hanger;
 
 	if (h) {
-		DHD_OS_PREFREE(dhd, h, WLFC_HANGER_SIZE(h->max_items));
+		MFREE(osh, h, WLFC_HANGER_SIZE(h->max_items));
 		return BCME_OK;
 	}
 	return BCME_BADARG;
@@ -2492,8 +2491,7 @@ int dhd_wlfc_enable(dhd_pub_t *dhd)
 	}
 
 	/* allocate space to track txstatus propagated from firmware */
-	dhd->wlfc_state = DHD_OS_PREALLOC(dhd, DHD_PREALLOC_DHD_WLFC_INFO,
-		sizeof(athost_wl_status_info_t));
+	dhd->wlfc_state = MALLOC(dhd->osh, sizeof(athost_wl_status_info_t));
 	if (dhd->wlfc_state == NULL) {
 		rc = BCME_NOMEM;
 		goto exit;
@@ -2508,10 +2506,9 @@ int dhd_wlfc_enable(dhd_pub_t *dhd)
 	wlfc->dhdp = dhd;
 
 	if (!WLFC_GET_AFQ(dhd->wlfc_mode)) {
-		wlfc->hanger = _dhd_wlfc_hanger_create(dhd, WLFC_HANGER_MAXITEMS);
+		wlfc->hanger = _dhd_wlfc_hanger_create(dhd->osh, WLFC_HANGER_MAXITEMS);
 		if (wlfc->hanger == NULL) {
-			DHD_OS_PREFREE(dhd, dhd->wlfc_state,
-				sizeof(athost_wl_status_info_t));
+			MFREE(dhd->osh, dhd->wlfc_state, sizeof(athost_wl_status_info_t));
 			dhd->wlfc_state = NULL;
 			rc = BCME_NOMEM;
 			goto exit;
@@ -3316,13 +3313,12 @@ dhd_wlfc_deinit(dhd_pub_t *dhd)
 
 	if (!WLFC_GET_AFQ(dhd->wlfc_mode)) {
 		/* delete hanger */
-		_dhd_wlfc_hanger_delete(dhd, wlfc->hanger);
+		_dhd_wlfc_hanger_delete(dhd->osh, wlfc->hanger);
 	}
 
 
 	/* free top structure */
-	DHD_OS_PREFREE(dhd, dhd->wlfc_state,
-		sizeof(athost_wl_status_info_t));
+	MFREE(dhd->osh, dhd->wlfc_state, sizeof(athost_wl_status_info_t));
 	dhd->wlfc_state = NULL;
 	dhd->proptxstatus_mode = hostreorder ?
 		WLFC_ONLY_AMPDU_HOSTREORDER : WLFC_FCMODE_NONE;
