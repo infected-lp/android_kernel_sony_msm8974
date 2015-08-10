@@ -47,19 +47,6 @@
 		qcom,sda-gpio = <&msmgpio 6 0x00>;
 		qcom,master-id = <86>;
 		status = "ok";
-		synaptics_clearpad@2c {
-			compatible = "synaptics,clearpad";
-			reg = <0x2c>;
-			interrupt-parent = <&msmgpio>;
-			interrupts = <61 0x2>;
-			touch_vdd-supply = <&pm8941_l22>;
-			touch_vio-supply = <&pm8941_s3>;
-			synaptics,irq_gpio = <&msmgpio 61 0x00>;
-			preset_x_max = <1079>;
-			preset_y_max = <1919>;
-			preset_n_fingers = <10>;
-			preset_n_bytes_per_object = <8>;
-		};
 		maxim_max1187x_tsc@48 {
 			compatible = "maxim,max1187x_tsc";
 			reg = <0x48>;
@@ -92,7 +79,6 @@
 			touch_pressure_enabled = <1>;
 			touch_size_enabled = <0>;
 			touch_orientation_enabled = <0>;
-			glove_enabled = <0>;
 			report_pen_as_finger = <1>;
 			wakeup_gesture_support = <0>;
 			wakeup_gesture_timeout = <0>;
@@ -655,6 +641,10 @@
 			<&pm8941_gpios 6 0>,
 			<&pm8941_gpios 7 0>,
 			<&pm8941_gpios 14 0>;
+	};
+
+	qcom,wdt@f9017000 {
+		qcom,bark-time = <12000>;
 	};
 
 	qcom,msm-thermal {
@@ -1409,7 +1399,7 @@
 };
 
 &mdss_fb0 {
-	qcom,memory-reservation-size = <0x1000000>; /* size 16MB */
+	linux,contiguous-region = <&fb_mem>;
 };
 
 &mdss_dsi0 {
@@ -1449,5 +1439,15 @@
 			qcom,supply-post-on-sleep = <0>;
 			qcom,supply-pre-off-sleep = <0>;
 			qcom,supply-post-off-sleep = <0>;
+	};
+};
+
+/ {
+	memory {
+		fb_mem: fb_region@0 {
+			linux,contiguous-region;
+			reg = <0 0x1000000>;
+			label = "fb_mem";
+		};
 	};
 };
