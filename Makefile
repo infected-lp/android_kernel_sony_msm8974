@@ -380,10 +380,18 @@ endif
 CPP = $(CC) -E
 
 # Highest level of basic gcc optimizations if enabled
-ifeq ($(strip $(LOCAL_O3)),true)
-  SABERMOD_KERNEL_FLAGS	:= -O3
+ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
+  SABERMOD_KERNEL_FLAGS := -Os
 else
-  SABERMOD_KERNEL_FLAGS := -O2
+  ifneq ($(strip $(DISABLE_O3_KERNEL)),true)
+    ifeq ($(strip $(LOCAL_O3)),true)
+      SABERMOD_KERNEL_FLAGS := -O3
+    else
+      SABERMOD_KERNEL_FLAGS := -O2
+    endif
+  else
+    SABERMOD_KERNEL_FLAGS := -O2
+  endif
 endif
 
 # Extra flags
@@ -440,6 +448,12 @@ else
   ifdef GRAPHITE_KERNEL_FLAGS
     SABERMOD_KERNEL_FLAGS := $(GRAPHITE_KERNEL_FLAGS) -marm
   endif
+endif
+
+ifneq ($(filter -floop-parallelize-all -ftree-parallelize-loops=% -fopenmp,$(SABERMOD_KERNEL_FLAGS)),)
+  SABERMOD_KERNEL_FLAGS += \
+    -L $(TARGET_ARCH_LIB_PATH)/gcc/arm-linux-androideabi/$(TARGET_SM_AND).x-sabermod/armv7-a \
+    -lgomp -lgcc
 endif
 
 # Add everything to CC at the end
@@ -669,7 +683,15 @@ all: vmlinux
 #
 
 # Handle kernel CC flags by importing vendor/sm strings
-ifneq ($(strip $(LOCAL_O3)),true)
+ifneq ($(strip $(DISABLE_O3_KERNEL)),true)
+  ifneq ($(strip $(LOCAL_O3)),true)
+    ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
+      KBUILD_CFLAGS += -Os $(call cc-disable-warning,maybe-uninitialized,)
+    else
+      KBUILD_CFLAGS += -O2
+    endif
+  endif
+else
   ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
     KBUILD_CFLAGS += -Os $(call cc-disable-warning,maybe-uninitialized,)
   else
