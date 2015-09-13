@@ -448,12 +448,6 @@ else
   endif
 endif
 
-ifneq ($(filter -floop-parallelize-all -ftree-parallelize-loops=% -fopenmp,$(SABERMOD_KERNEL_FLAGS)),)
-  SABERMOD_KERNEL_FLAGS += \
-    -L $(TARGET_ARCH_LIB_PATH)/gcc/arm-linux-androideabi/$(TARGET_SM_AND).x-sabermod/armv7-a \
-    -lgomp -lgcc
-endif
-
 # Add everything to CC at the end
 ifdef SABERMOD_KERNEL_FLAGS
   CC += $(SABERMOD_KERNEL_FLAGS)
