@@ -444,7 +444,15 @@ ifdef SABERMOD_KERNEL_FLAGS
   endif
 else
   ifdef GRAPHITE_KERNEL_FLAGS
-    SABERMOD_KERNEL_FLAGS := $(GRAPHITE_KERNEL_FLAGS) -marm
+    SABERMOD_KERNEL_FLAGS := $(GRAPHITE_KERNEL_FLAGS)
+  endif
+endif
+
+ifeq (arm,$(strip $(ARCH)))
+  ifdef SABERMOD_KERNEL_FLAGS
+    SABERMOD_KERNEL_FLAGS += -marm
+  else
+    SABERMOD_KERNEL_FLAGS := -marm
   endif
 endif
 
@@ -452,6 +460,13 @@ endif
 ifdef SABERMOD_KERNEL_FLAGS
   CC += $(SABERMOD_KERNEL_FLAGS)
 endif
+
+ifdef SM_KERNEL_NAME
+  export LD_LIBRARY_PATH=$(TARGET_ARCH_KERNEL_LIB_PATH);
+  export LIBRARY_PATH=$(TARGET_ARCH_KERNEL_LIB_PATH);
+  export C_INCLUDE_PATH=$(TARGET_ARCH_KERNEL_INC_PATH);
+endif
+  
 # end The SaberMod Project additions
 
 CPP = $(CC) -E
