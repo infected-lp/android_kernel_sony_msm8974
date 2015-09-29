@@ -49,6 +49,13 @@
 #include "platsmp.h"
 
 
+#ifdef CONFIG_KEXEC_HARDBOOT
+#include <linux/memblock.h>
+#include <asm/setup.h>
+#endif
+
+#define MSM_PERSISTENT_RAM_SIZE (SZ_1M)
+
 static struct memtype_reserve msm8974_reserve_table[] __initdata = {
 	[MEMTYPE_SMI] = {
 	},
@@ -72,6 +79,18 @@ static struct reserve_info msm8974_reserve_info __initdata = {
 
 void __init msm_8974_reserve(void)
 {
+#ifdef CONFIG_KEXEC_HARDBOOT
+	// Reserve space for hardboot page - just after ram_console,
+	// at the start of second memory bank
+	struct membank *mb = &meminfo.bank[meminfo.nr_banks - 1];
+	phys_addr_t start = mb->start + SZ_1M + MSM_PERSISTENT_RAM_SIZE;
+
+	int ret = memblock_remove(start, SZ_1M);
+	if(!ret)
+		pr_info("Hardboot page reserved at 0x%X\n", start);
+	else
+		pr_err("Failed to reserve space for hardboot page at 0x%X!\n", start);
+#endif
 	reserve_info = &msm8974_reserve_info;
 	of_scan_flat_dt(dt_scan_for_memory_reserve, msm8974_reserve_table);
 	msm_reserve();
